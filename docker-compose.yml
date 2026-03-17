@@ -1,0 +1,54 @@
+services:
+  fastapi:
+    build: ./
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    networks:
+      - monitoring-net
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring-net
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - ./victoriametrics/scrape.yml:/etc/vm/scrape.yml
+      - vm-data:/victoria-metrics-data
+    command:
+      - '--promscrape.config=/etc/vm/scrape.yml'
+      - '--storageDataPath=/victoria-metrics-data'
+    networks:
+      - monitoring-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - victoriametrics
+    networks:
+      - monitoring-net
+
+volumes:
+  vm-data:
+  grafana-data:
+
+networks:
+  monitoring-net:
+    driver: bridge
